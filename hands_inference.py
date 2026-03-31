@@ -1,9 +1,7 @@
 import cv2
 import mediapipe as mp
-from mediapipe import solutions
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from mediapipe.framework.formats import landmark_pb2
 import numpy as np
 from flask import Flask, render_template, Response
 import os
@@ -11,9 +9,37 @@ import urllib.request
 
 app = Flask(__name__)
 
-# Inicializar MediaPipe
-mp_drawing = solutions.drawing_utils
-mp_hands = solutions.hands
+# Conexões das mãos (índices dos landmarks conectados)
+HAND_CONNECTIONS = [
+    (0, 1), (1, 2), (2, 3), (3, 4),      # Polegar
+    (0, 5), (5, 6), (6, 7), (7, 8),      # Indicador
+    (0, 9), (9, 10), (10, 11), (11, 12), # Médio
+    (0, 13), (13, 14), (14, 15), (15, 16), # Anelar
+    (0, 17), (17, 18), (18, 19), (19, 20), # Mindinho
+    (5, 9), (9, 13), (13, 17)            # Conexões na palma
+]
+
+def draw_hand_landmarks(image, hand_landmarks, connections, landmark_color=(0, 255, 0), 
+                        connection_color=(0, 255, 255), thickness=2, circle_radius=2):
+    """Desenha os landmarks e conexões das mãos na imagem"""
+    h, w, _ = image.shape
+    
+    # Converter landmarks para coordenadas de pixel
+    points = []
+    for landmark in hand_landmarks:
+        x = int(landmark.x * w)
+        y = int(landmark.y * h)
+        points.append((x, y))
+    
+    # Desenhar conexões
+    for connection in connections:
+        start_idx, end_idx = connection
+        if start_idx < len(points) and end_idx < len(points):
+            cv2.line(image, points[start_idx], points[end_idx], connection_color, thickness)
+    
+    # Desenhar pontos dos landmarks
+    for point in points:
+        cv2.circle(image, point, circle_radius, landmark_color, -1)
 
 class HandGestureDetector:
     def __init__(self):
@@ -110,15 +136,6 @@ class HandGestureDetector:
             hand_count = len(hand_result.hand_landmarks)
             
             for idx, hand_landmarks in enumerate(hand_result.hand_landmarks):
-                # Converter landmarks para formato compatível
-                landmark_list = landmark_pb2.NormalizedLandmarkList()
-                for landmark in hand_landmarks:
-                    landmark_proto = landmark_pb2.NormalizedLandmark()
-                    landmark_proto.x = landmark.x
-                    landmark_proto.y = landmark.y
-                    landmark_proto.z = landmark.z
-                    landmark_list.landmark.append(landmark_proto)
-                
                 # Determinar se é mão esquerda ou direita
                 handedness = hand_result.handedness[idx][0]
                 hand_label_en = handedness.category_name
@@ -127,18 +144,20 @@ class HandGestureDetector:
                 hand_label = self.handedness_translations.get(hand_label_en, hand_label_en)
                 
                 # Desenhar landmarks das mãos
-                mp_drawing.draw_landmarks(
+                draw_hand_landmarks(
                     frame,
-                    landmark_list,
-                    mp_hands.HAND_CONNECTIONS,
-                    mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                    mp_drawing.DrawingSpec(color=(0, 255, 255), thickness=2, circle_radius=1)
+                    hand_landmarks,
+                    HAND_CONNECTIONS,
+                    landmark_color=(0, 255, 0),
+                    connection_color=(0, 255, 255),
+                    thickness=2,
+                    circle_radius=2
                 )
                 
                 # Adicionar label da mão
                 h, w, c = frame.shape
-                cx = int(landmark_list.landmark[0].x * w)
-                cy = int(landmark_list.landmark[0].y * h)
+                cx = int(hand_landmarks[0].x * w)
+                cy = int(hand_landmarks[0].y * h)
                 cv2.putText(frame, f'{hand_label} ({hand_score:.2f})', 
                            (cx - 50, cy - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
@@ -212,9 +231,9 @@ def video_feed():
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    print("🚀 Iniciando Hand Landmarker e Gesture Recognition - CIAg")
-    print("✋ Detecção de até 6 mãos simultâneas")
-    print("🤝 Reconhecimento de gestos em PORTUGUÊS")
-    print("📱 Acesse: http://localhost:5000")
+    print("Iniciando Hand Landmarker e Gesture Recognition - CIAg")
+    print("Detecção de até 6 mãos simultâneas")
+    print("Reconhecimento de gestos em PORTUGUÊS")
+    print("Acesse: http://localhost:8888")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8888)

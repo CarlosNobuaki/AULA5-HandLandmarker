@@ -19,7 +19,7 @@ python3 -c "import cv2, mediapipe, flask, numpy; print('✅ Dependências OK!')"
 echo "Iniciando servidor..."
 echo "✋ Detecção de mãos: até 4 mãos simultâneas"
 echo "🤝 Reconhecimento de gestos em tempo real"
-echo "Acesse: http://localhost:5000"
+echo "Acesse: http://localhost:8888"
 echo "Pressione Ctrl+C para parar"
 echo "======================================================"
 
